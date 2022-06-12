@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 import numpy as np
 import torch
 from torch import optim
-import pandas as pd
 
 from preprocessing.dataset import Config, SiameseNetworkDataset, TRAINING_TRANSFORMATION_SEQUENCE_1, \
     TESTING_TRANSFORMATION_SEQUENCE_1, SiameseNetworkDatasetTesting
@@ -44,6 +43,8 @@ def train(
         output1, output2 = model(img0, img1)
         loss_contrastive = criterion(output1, output2, label)
         loss_contrastive.backward()
+        # Apply gradient clipping to prevent nan loss after n epochs
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0, norm_type=2)
         optimizer.step()
         epoch_loss_values.append(loss_contrastive.detach().cpu().numpy())
         if i % log_after_n_iterations == 0:
