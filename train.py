@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 import torch
 from torch import optim
+from  torch.optim.lr_scheduler import StepLR
 
 from preprocessing.dataset import Config, SiameseNetworkDataset, TRAINING_TRANSFORMATION_SEQUENCE_1, \
     TESTING_TRANSFORMATION_SEQUENCE_1, SiameseNetworkDatasetTesting
@@ -112,20 +113,18 @@ def validate(
 
 
 if __name__ == "__main__":
-    siamese_dataset = SiameseNetworkDataset(
+    from torch.utils.data import SubsetRandomSampler
+
+    training_dataset1 = SiameseNetworkDataset(
         Config.training_csv,
         Config.training_dir,
         transform=TRAINING_TRANSFORMATION_SEQUENCE_1
     )
-
-    # Load the dataset as pytorch tensors using dataloader
-    train_dataloader = DataLoader(
-        siamese_dataset,
-        shuffle=True,
-        num_workers=8,
-        batch_size=Config.train_batch_size
+    training_dataset2 = SiameseNetworkDataset(
+        Config.testing_csv,
+        Config.testing_dir,
+        transform=TRAINING_TRANSFORMATION_SEQUENCE_1
     )
-
     # Load the test dataset
     test_dataset = SiameseNetworkDatasetTesting(
         image_pair_label_csv=Config.testing_csv,
@@ -133,12 +132,27 @@ if __name__ == "__main__":
         transform=TESTING_TRANSFORMATION_SEQUENCE_1
     )
 
+    # Load the dataset as pytorch tensors using dataloader
+    train_dataloader1 = DataLoader(
+        training_dataset1,
+        sampler=SubsetRandomSampler(range(len(training_dataset1))),
+        shuffle=False,
+        num_workers=8,
+        batch_size=Config.train_batch_size
+    )
+    train_dataloader2 = DataLoader(
+        training_dataset2,
+        sampler=SubsetRandomSampler(len(training_dataset1)),
+        shuffle=False,
+        num_workers=8,
+        batch_size=Config.train_batch_size
+    )
     test_dataloader = DataLoader(
         test_dataset,
         num_workers=6,
         batch_size=1,
         # No shuffling for easier comparison?
-        shuffle=False,
+        shuffle=True,
     )
 
     # Declare Siamese Network
@@ -146,9 +160,13 @@ if __name__ == "__main__":
     # Declare Loss Function
     criterion = ContrastiveLoss()
     # Declare Optimizer
-    optimizer = optim.RMSprop(net.parameters(), lr=1e-4, alpha=0.99, eps=1e-8, weight_decay=0.0005, momentum=0.9)
+    optimizer = optim.SGD(net.parameters(), lr=0.0001, weight_decay=0.00005)
+    # Set learning rate schedule for the optimizer
+    scheduler = StepLR(optimizer, step_size=Config.train_number_epochs, gamma=0.1)
 
     for epoch in tqdm(range(0, Config.train_number_epochs)):
+        # Train: alternate dataset
+        train_dataloader = train_dataloader1 if epoch % 2 == 0 else train_dataloader2
         model_epoch, loss_history_epoch, total_number_of_iterations_epoch = train(
             model=net, dataloader_instance=train_dataloader, epoch=epoch
         )
@@ -166,6 +184,7 @@ if __name__ == "__main__":
                 f"loss_history_epoch_{epoch}"), "wb")
         )
 
+        # Validate
         output_pairs_epoch, predicted_label_values, eucledian_distance_values, image_pairs = validate(
             model=net, dataloader_instance=test_dataloader, epoch=epoch
         )
@@ -175,3 +194,6 @@ if __name__ == "__main__":
                 MODEL_CHECKPOINT_STATE_DICTS_FOLDER,
                 f"output_pairs_epoch_{epoch}"), "wb")
         )
+
+        # Reduce learning rate for the next epoch
+        scheduler.step()

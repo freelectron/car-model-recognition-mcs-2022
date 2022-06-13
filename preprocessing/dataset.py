@@ -17,7 +17,7 @@ class Config:
     training_csv = "../stanford_cars_dataset/dataset_siamese_nn/training_data/df_training_siamese.csv"
     testing_dir = "../stanford_cars_dataset/dataset_siamese_nn/testing_data/images"
     testing_csv = "../stanford_cars_dataset/dataset_siamese_nn/testing_data/df_testing_siamese.csv"
-    train_batch_size = 8
+    train_batch_size = 4
     train_number_epochs = 20
     image_input_size = 224
 
