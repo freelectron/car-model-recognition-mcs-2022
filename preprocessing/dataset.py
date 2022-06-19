@@ -7,18 +7,20 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 
+from stanford_cars_dataset.create_siamese_training_dataset import process_image
+
 
 @dataclass
 class Config:
     """
     Specs for training.
     """
-    training_dir = "../stanford_cars_dataset/dataset_siamese_nn/training_data/images"
-    training_csv = "../stanford_cars_dataset/dataset_siamese_nn/training_data/df_training_siamese.csv"
-    testing_dir = "../stanford_cars_dataset/dataset_siamese_nn/testing_data/images"
-    testing_csv = "../stanford_cars_dataset/dataset_siamese_nn/testing_data/df_testing_siamese.csv"
-    train_batch_size = 4
-    train_number_epochs = 20
+    training_dir = "../stanford_cars_dataset/dataset_siamese_nn/images"
+    training_csv = "../stanford_cars_dataset/dataset_siamese_nn/df_train_overfit_siamese.csv"  # FIXME: change back
+    testing_dir = "../stanford_cars_dataset/dataset_siamese_nn/images"
+    testing_csv = "../stanford_cars_dataset/dataset_siamese_nn/df_testing_siamese.csv"
+    train_batch_size = 8
+    train_number_epochs = 150
     image_input_size = 224
 
 
@@ -78,7 +80,7 @@ class SiameseNetworkDataset:
         return len(self.image_pair_label_csv)
 
 
-class SiameseNetworkDatasetTesting(SiameseNetworkDataset):
+class SiameseNetworkDatasetValidation(SiameseNetworkDataset):
     """
     Define how to load and transform images.
     Two images-pair as one training example.
@@ -114,6 +116,70 @@ class SiameseNetworkDatasetTesting(SiameseNetworkDataset):
                torch.from_numpy(np.array([int(self.image_pair_label_csv.iat[index, 2])], dtype=np.float32)),\
                image1_path,\
                image2_path
+
+
+class SiameseNetworkDatasetTesting:
+    """
+    Preprocess images from ODS competition, make them usable for the Siamese network.
+    """
+
+    @staticmethod
+    def preprocess_image_pair_df(image_pair_df: pd.DataFrame) -> pd.DataFrame:
+        return image_pair_df[["img1", "img2"]]
+
+    @staticmethod
+    def preprocess_annotation_df(annotation_df: pd.DataFrame) -> pd.DataFrame:
+        result_df = annotation_df.set_index("img_path")
+        result_df["car_model"] = "Unknown"
+        return result_df
+
+    def __init__(
+            self,
+            image_pair_csv,
+            annotation_csv,
+            image_directory,
+            transform,
+    ):
+        # Used to prepare the labels and images path
+        self.image_pair_df = self.preprocess_image_pair_df(pd.read_csv(image_pair_csv))
+        self.annotation_df = self.preprocess_annotation_df(pd.read_csv(annotation_csv))
+        self.image_directory = image_directory
+        self.transform = transform
+
+    def __getitem__(self, index):
+
+        image1_file_name = self.image_pair_df.iat[index, 0]
+        image2_file_name = self.image_pair_df.iat[index, 1]
+
+        # Loading and processing as for the training dataset
+        image1 = process_image(
+            image_file_name=image1_file_name,
+            car_model_folder=self.image_directory,
+            annotation_df=self.annotation_df,
+            images_folder_path="",
+            save_cropped_image=False
+        )
+        image2 = process_image(
+            image_file_name=image2_file_name,
+            car_model_folder=self.image_directory,
+            annotation_df=self.annotation_df,
+            images_folder_path="",
+            save_cropped_image=False
+        )
+
+        # See what conversion was applied for training
+        image1 = image1.convert("RGB")
+        image2 = image2.convert("RGB")
+
+        # Apply image transformations
+        if self.transform is not None:
+            image1 = self.transform(image1)
+            image2 = self.transform(image2)
+
+        return image1, image2
+
+    def __len__(self):
+        return len(self.image_pair_df)
 
 
 # FIXME: delete testing code
