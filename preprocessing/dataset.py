@@ -15,6 +15,7 @@ class Config:
     """
     Specs for training.
     """
+
     training_dir = "../comp_cars_dataset/dataset_siamese_classification_nn/images"
     # training_dir =  "../stanford_cars_dataset/dataset_siamese_nn/images"
     training_csv = "../comp_cars_dataset/dataset_siamese_classification_nn/df_training_classification.csv"
@@ -29,22 +30,25 @@ class Config:
 
 
 NORMALISATION_1 = tv.transforms.Normalize(
-    mean=[0.485, 0.456, 0.406],
-    std=[0.229, 0.224, 0.225]
+    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
 )
-TRAINING_TRANSFORMATION_SEQUENCE_1 = tv.transforms.Compose([
-    tv.transforms.RandomResizedCrop(Config.image_input_size),
-    tv.transforms.RandomHorizontalFlip(),
-    tv.transforms.ToTensor(),
-    NORMALISATION_1
-])
+TRAINING_TRANSFORMATION_SEQUENCE_1 = tv.transforms.Compose(
+    [
+        tv.transforms.RandomResizedCrop(Config.image_input_size),
+        tv.transforms.RandomHorizontalFlip(),
+        tv.transforms.ToTensor(),
+        NORMALISATION_1,
+    ]
+)
 
-TESTING_TRANSFORMATION_SEQUENCE_1 = tv.transforms.Compose([
-    tv.transforms.Resize((Config.image_input_size, Config.image_input_size)),
-    tv.transforms.CenterCrop(Config.image_input_size),
-    tv.transforms.ToTensor(),
-    NORMALISATION_1
-])
+TESTING_TRANSFORMATION_SEQUENCE_1 = tv.transforms.Compose(
+    [
+        tv.transforms.Resize((Config.image_input_size, Config.image_input_size)),
+        tv.transforms.CenterCrop(Config.image_input_size),
+        tv.transforms.ToTensor(),
+        NORMALISATION_1,
+    ]
+)
 
 
 class SiameseNetworkDataset:
@@ -55,14 +59,20 @@ class SiameseNetworkDataset:
 
     def __init__(self, image_pair_label_csv=None, image_directory=None, transform=None):
         # used to prepare the labels and images path
-        self.image_pair_label_csv = pd.read_csv(image_pair_label_csv)[["image1", "image2", "label"]]
+        self.image_pair_label_csv = pd.read_csv(image_pair_label_csv)[
+            ["image1", "image2", "label"]
+        ]
         self.image_directory = image_directory
         self.transform = transform
 
     def __getitem__(self, index):
         # getting the image path
-        image1_path = os.path.join(self.image_directory, self.image_pair_label_csv.iat[index, 0])
-        image2_path = os.path.join(self.image_directory, self.image_pair_label_csv.iat[index, 1])
+        image1_path = os.path.join(
+            self.image_directory, self.image_pair_label_csv.iat[index, 0]
+        )
+        image2_path = os.path.join(
+            self.image_directory, self.image_pair_label_csv.iat[index, 1]
+        )
 
         # Loading the image
         img0 = Image.open(image1_path)
@@ -77,7 +87,15 @@ class SiameseNetworkDataset:
             img0 = self.transform(img0)
             img1 = self.transform(img1)
 
-        return img0, img1, torch.from_numpy(np.array([int(self.image_pair_label_csv.iat[index, 2])], dtype=np.float32))
+        return (
+            img0,
+            img1,
+            torch.from_numpy(
+                np.array(
+                    [int(self.image_pair_label_csv.iat[index, 2])], dtype=np.float32
+                )
+            ),
+        )
 
     def __len__(self):
         return len(self.image_pair_label_csv)
@@ -93,13 +111,17 @@ class SiameseNetworkDatasetValidation(SiameseNetworkDataset):
         super().__init__(
             image_pair_label_csv=image_pair_label_csv,
             image_directory=image_directory,
-            transform=transform
+            transform=transform,
         )
 
     def __getitem__(self, index):
         # getting the image path
-        image1_path = os.path.join(self.image_directory, self.image_pair_label_csv.iat[index, 0])
-        image2_path = os.path.join(self.image_directory, self.image_pair_label_csv.iat[index, 1])
+        image1_path = os.path.join(
+            self.image_directory, self.image_pair_label_csv.iat[index, 0]
+        )
+        image2_path = os.path.join(
+            self.image_directory, self.image_pair_label_csv.iat[index, 1]
+        )
 
         # Loading the image
         img0 = Image.open(image1_path)
@@ -114,11 +136,17 @@ class SiameseNetworkDatasetValidation(SiameseNetworkDataset):
             img0 = self.transform(img0)
             img1 = self.transform(img1)
 
-        return img0,\
-               img1,\
-               torch.from_numpy(np.array([int(self.image_pair_label_csv.iat[index, 2])], dtype=np.float32)),\
-               image1_path,\
-               image2_path
+        return (
+            img0,
+            img1,
+            torch.from_numpy(
+                np.array(
+                    [int(self.image_pair_label_csv.iat[index, 2])], dtype=np.float32
+                )
+            ),
+            image1_path,
+            image2_path,
+        )
 
 
 class SiameseNetworkDatasetTesting:
@@ -137,11 +165,11 @@ class SiameseNetworkDatasetTesting:
         return result_df
 
     def __init__(
-            self,
-            image_pair_csv,
-            annotation_csv,
-            image_directory,
-            transform,
+        self,
+        image_pair_csv,
+        annotation_csv,
+        image_directory,
+        transform,
     ):
         # Used to prepare the labels and images path
         self.image_pair_df = self.preprocess_image_pair_df(pd.read_csv(image_pair_csv))
@@ -160,14 +188,14 @@ class SiameseNetworkDatasetTesting:
             car_model_folder=self.image_directory,
             annotation_df=self.annotation_df,
             images_folder_path="",
-            save_cropped_image=False
+            save_cropped_image=False,
         )
         image2 = process_image(
             image_file_name=image2_file_name,
             car_model_folder=self.image_directory,
             annotation_df=self.annotation_df,
             images_folder_path="",
-            save_cropped_image=False
+            save_cropped_image=False,
         )
 
         # See what conversion was applied for training
@@ -196,13 +224,10 @@ if __name__ == "__main__":
     training_csv = "../stanford_cars_dataset/dataset_siamese_nn/training_data/df_training_siamese.csv"
     training_dir = "../stanford_cars_dataset/dataset_siamese_nn/training_data/images"
 
-    siamese_dataset = SiameseNetworkDataset(training_csv,
-                                            training_dir,
-                                            transform=TRAINING_TRANSFORMATION_SEQUENCE_1
-                                            )
-    vis_dataloader = DataLoader(siamese_dataset,
-                                shuffle=True,
-                                batch_size=8)
+    siamese_dataset = SiameseNetworkDataset(
+        training_csv, training_dir, transform=TRAINING_TRANSFORMATION_SEQUENCE_1
+    )
+    vis_dataloader = DataLoader(siamese_dataset, shuffle=True, batch_size=8)
 
     dataiter = iter(vis_dataloader)
 
@@ -211,5 +236,3 @@ if __name__ == "__main__":
     # print(example_batch)
     imshow(tv.utils.make_grid(concatenated))
     print(example_batch[2].numpy())
-
-

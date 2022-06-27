@@ -1,8 +1,11 @@
+"""
+Train and validate a Siamese NN that directly outputs whether a pair of images are same/similar.
+"""
+
 import logging
 from datetime import datetime
 import os
 from typing import List
-import pickle
 
 import pandas as pd
 from pandas import DataFrame
@@ -16,28 +19,37 @@ import torch
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
 
-from preprocessing.dataset import Config, SiameseNetworkDataset, TRAINING_TRANSFORMATION_SEQUENCE_1, \
-    TESTING_TRANSFORMATION_SEQUENCE_1, SiameseNetworkDatasetValidation
+from preprocessing.dataset import (
+    Config,
+    SiameseNetworkDataset,
+    TRAINING_TRANSFORMATION_SEQUENCE_1,
+    TESTING_TRANSFORMATION_SEQUENCE_1,
+    SiameseNetworkDatasetValidation,
+)
 from modeling.model import SiameseNetwork
 from modeling.losses import ContrastiveLoss, PAIRWISEDISTANCE_P2
 
 START_OF_TRAIN = datetime.now().isoformat()[:16]
-MODEL_CHECKPOINT_STATE_DICTS_FOLDER = f"./modeling/model_store/siamese_v0_{START_OF_TRAIN}"
+MODEL_CHECKPOINT_STATE_DICTS_FOLDER = (
+    f"./modeling/model_store/siamese_v0_{START_OF_TRAIN}"
+)
 if not os.path.isdir(MODEL_CHECKPOINT_STATE_DICTS_FOLDER):
     os.makedirs(MODEL_CHECKPOINT_STATE_DICTS_FOLDER)
 
 logging.getLogger().setLevel(logging.INFO)
 # Create file handler which logs even debug messages
-fh = logging.FileHandler(os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f'train_{START_OF_TRAIN}.log'))
+fh = logging.FileHandler(
+    os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"train_{START_OF_TRAIN}.log")
+)
 fh.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(fh)
 
 
 def train(
-        model: torch.nn.Module,
-        dataloader_instance: SiameseNetworkDataset,
-        epoch: int,
-        log_after_n_iterations: int = 50
+    model: torch.nn.Module,
+    dataloader_instance: SiameseNetworkDataset,
+    epoch: int,
+    log_after_n_iterations: int = 50,
 ) -> (torch.nn.Module, List[List[float]], int):
     """
     Runs the main train loop.
@@ -64,14 +76,18 @@ def train(
         optimizer.step()
         # Save to calculate metrics on
         difference_embedding_vector += (output1 - output2).cuda().tolist()
-        euclidean_distances += PAIRWISEDISTANCE_P2(output1, output2).detach().cpu().tolist()
+        euclidean_distances += (
+            PAIRWISEDISTANCE_P2(output1, output2).detach().cpu().tolist()
+        )
         true_labels += label.squeeze().int().detach().cpu().tolist()
         epoch_loss_values.append(loss_contrastive.detach().cpu().numpy())
 
         if i % log_after_n_iterations == 0:
             loses_mean = np.array(epoch_loss_values).mean()
             logging.info(
-                "Epoch number {}| Iteration {}\nCurrent epoch's average train loss is {}\n".format(epoch, i, loses_mean)
+                "Epoch number {}| Iteration {}\nCurrent epoch's average train loss is {}\n".format(
+                    epoch, i, loses_mean
+                )
             )
             total_number_of_iterations += log_after_n_iterations
             loss_history.append(epoch_loss_values)
@@ -79,17 +95,26 @@ def train(
     # Calculate eval metrics
     similarity_scores = np.divide(
         (np.array([2] * len(euclidean_distances)) - np.array(euclidean_distances)),
-        np.array([2] * len(euclidean_distances))
+        np.array([2] * len(euclidean_distances)),
     ).tolist()
     roc_score = roc_auc_score(true_labels, similarity_scores)
-    logging.info("{} epoch finished. Train data ROC-AUC score based on euclidean similarity is {}".format(
-        epoch, roc_score)
+    logging.info(
+        "{} epoch finished. Train data ROC-AUC score based on euclidean similarity is {}".format(
+            epoch, roc_score
+        )
     )
-    clf = LogisticRegression(random_state=0).fit(np.array(euclidean_distances).reshape(-1, 1), true_labels)
-    similarity_scores_clf = clf.predict_proba(np.array(euclidean_distances).reshape(-1, 1))
-    roc_auc_score_clf_epoch = roc_auc_score(true_labels, np.argmax(similarity_scores_clf, axis=1))
-    logging.info("{} epoch finished. Train data ROC-AUC score based on euclidean similarity & logistic regression "
-                 "is {}".format(epoch, roc_auc_score_clf_epoch)
+    clf = LogisticRegression(random_state=0).fit(
+        np.array(euclidean_distances).reshape(-1, 1), true_labels
+    )
+    similarity_scores_clf = clf.predict_proba(
+        np.array(euclidean_distances).reshape(-1, 1)
+    )
+    roc_auc_score_clf_epoch = roc_auc_score(
+        true_labels, np.argmax(similarity_scores_clf, axis=1)
+    )
+    logging.info(
+        "{} epoch finished. Train data ROC-AUC score based on euclidean similarity & logistic regression "
+        "is {}".format(epoch, roc_auc_score_clf_epoch)
     )
 
     # FIXME: delete
@@ -105,11 +130,11 @@ def train(
 
 
 def validate(
-        model: torch.nn.Module,
-        dataloader_instance: SiameseNetworkDatasetValidation,
-        epoch: int,
-        output_classifier: LogisticRegression,
-        device: str = "cuda",
+    model: torch.nn.Module,
+    dataloader_instance: SiameseNetworkDatasetValidation,
+    epoch: int,
+    output_classifier: LogisticRegression,
+    device: str = "cuda",
 ) -> tuple[DataFrame, float]:
     true_label_values = list()
     output_embedding_img1 = list()
@@ -139,8 +164,11 @@ def validate(
 
             # Calculate similarity scores
             similarity_scores += np.divide(
-                (np.array([2] * len(euclidean_distances)) - np.array(euclidean_distances)),
-                np.array([2] * len(euclidean_distances))
+                (
+                    np.array([2] * len(euclidean_distances))
+                    - np.array(euclidean_distances)
+                ),
+                np.array([2] * len(euclidean_distances)),
             ).tolist()
 
             # Save images for later inspection
@@ -149,13 +177,20 @@ def validate(
 
     # Calculate ROC-AUC Score
     roc_auc_score_epoch = roc_auc_score(true_label_values, similarity_scores)
-    logging.info("{} epoch finished. Test data ROC-AUC score based on euclidean similarity is {}".format(
-        epoch, roc_auc_score_epoch)
+    logging.info(
+        "{} epoch finished. Test data ROC-AUC score based on euclidean similarity is {}".format(
+            epoch, roc_auc_score_epoch
+        )
     )
-    similarity_scores_clf = output_classifier.predict_proba(np.array(euclidean_distance_values).reshape(-1, 1))
-    roc_auc_score_clf_epoch = roc_auc_score(true_label_values, np.argmax(similarity_scores_clf, axis=1))
-    logging.info("{} epoch finished. Test data ROC-AUC score based on euclidean similarity & logistic regression "
-                 "is {}".format(epoch, roc_auc_score_clf_epoch)
+    similarity_scores_clf = output_classifier.predict_proba(
+        np.array(euclidean_distance_values).reshape(-1, 1)
+    )
+    roc_auc_score_clf_epoch = roc_auc_score(
+        true_label_values, np.argmax(similarity_scores_clf, axis=1)
+    )
+    logging.info(
+        "{} epoch finished. Test data ROC-AUC score based on euclidean similarity & logistic regression "
+        "is {}".format(epoch, roc_auc_score_clf_epoch)
     )
     logging.info("=========================================")
 
@@ -180,13 +215,13 @@ if __name__ == "__main__":
     training_dataset = SiameseNetworkDataset(
         Config.training_csv,
         Config.training_dir,
-        transform=TRAINING_TRANSFORMATION_SEQUENCE_1
+        transform=TRAINING_TRANSFORMATION_SEQUENCE_1,
     )
     # Load the test dataset
     test_dataset = SiameseNetworkDatasetValidation(
         image_pair_label_csv=Config.testing_csv,
         image_directory=Config.testing_dir,
-        transform=TESTING_TRANSFORMATION_SEQUENCE_1
+        transform=TESTING_TRANSFORMATION_SEQUENCE_1,
     )
 
     # Load the dataset as pytorch tensors using dataloader
@@ -194,7 +229,7 @@ if __name__ == "__main__":
         training_dataset,
         shuffle=True,
         num_workers=12,
-        batch_size=Config.train_batch_size
+        batch_size=Config.train_batch_size,
     )
     test_dataloader = DataLoader(
         test_dataset,
@@ -206,8 +241,12 @@ if __name__ == "__main__":
 
     # Declare Siamese Network
     load_model_folder = "./modeling/model_store/siamese_v0_2022-06-16T18:43/"
-    load_model_from_state_dictionary = os.path.join(load_model_folder, "model_9_epoch.pt")
-    net = SiameseNetwork().cuda()  # FIXME: load previous run ? load_model_from_state_dictionary
+    load_model_from_state_dictionary = os.path.join(
+        load_model_folder, "model_9_epoch.pt"
+    )
+    net = (
+        SiameseNetwork().cuda()
+    )  # FIXME: load previous run ? load_model_from_state_dictionary
     # Declare Loss Function
     criterion = ContrastiveLoss()
     # Declare Optimizer
@@ -222,36 +261,35 @@ if __name__ == "__main__":
             model=net, dataloader_instance=train_dataloader, epoch=epoch
         )
 
-        # FIXME: UNCOMMENT THE BLOCK
-        # torch.save(
-        #     net.state_dict(),
-        #     os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"model_{epoch}_epoch.pt")
-        # )
-        # pickle.dump(
-        #     loss_history_epoch,
-        #     open(os.path.join(
-        #         MODEL_CHECKPOINT_STATE_DICTS_FOLDER,
-        #         f"loss_history_epoch_{epoch}"), "wb")
-        # )
-        # pickle.dump(
-        #     output_classifier,
-        #     open(os.path.join(
-        #         MODEL_CHECKPOINT_STATE_DICTS_FOLDER,
-        #         f"output_classifier_epoch_{epoch}"), "wb")
-        # )
+        torch.save(
+            net.state_dict(),
+            os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"model_{epoch}_epoch.pt")
+        )
+        pickle.dump(
+            loss_history_epoch,
+            open(os.path.join(
+                MODEL_CHECKPOINT_STATE_DICTS_FOLDER,
+                f"loss_history_epoch_{epoch}"), "wb")
+        )
+        pickle.dump(
+            output_classifier,
+            open(os.path.join(
+                MODEL_CHECKPOINT_STATE_DICTS_FOLDER,
+                f"output_classifier_epoch_{epoch}"), "wb")
+        )
 
-        # # Only use when testing validation
-        # output_classifier = pickle.load(
-        #     open(os.path.join(
-        #         load_model_folder,
-        #         f"output_classifier_epoch_{epoch}"), "rb")
-        # )
+        # Only use when testing validation
+        output_classifier = pickle.load(
+            open(os.path.join(
+                load_model_folder,
+                f"output_classifier_epoch_{epoch}"), "rb")
+        )
 
-        # Validate
-        # df_epoch_validation, roc_auc_score_epoch = validate(
-        #     model=net, dataloader_instance=test_dataloader, epoch=epoch, output_classifier=output_classifier,
-        # )
-        # df_epoch_validation.to_csv(os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"validation_df_{epoch}"))
+        Validate
+        df_epoch_validation, roc_auc_score_epoch = validate(
+            model=net, dataloader_instance=test_dataloader, epoch=epoch, output_classifier=output_classifier,
+        )
+        df_epoch_validation.to_csv(os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"validation_df_{epoch}"))
 
         # Reduce learning rate for the next epoch
         scheduler.step()

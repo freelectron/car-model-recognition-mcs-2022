@@ -17,27 +17,36 @@ import torch
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
 
-from preprocessing.dataset import Config, SiameseNetworkDataset, TRAINING_TRANSFORMATION_SEQUENCE_1, \
-    TESTING_TRANSFORMATION_SEQUENCE_1, SiameseNetworkDatasetValidation
+from preprocessing.dataset import (
+    Config,
+    SiameseNetworkDataset,
+    TRAINING_TRANSFORMATION_SEQUENCE_1,
+    TESTING_TRANSFORMATION_SEQUENCE_1,
+    SiameseNetworkDatasetValidation,
+)
 from modeling.model import SiameseNetwork, ClassificationNetwork
 from modeling.losses import ContrastiveLoss, PAIRWISEDISTANCE_P2
 
 START_OF_TRAIN = datetime.now().isoformat()[:16]
-MODEL_CHECKPOINT_STATE_DICTS_FOLDER = f"./modeling/model_store/classification_cc_v0_{START_OF_TRAIN}"
+MODEL_CHECKPOINT_STATE_DICTS_FOLDER = (
+    f"./modeling/model_store/classification_cc_v0_{START_OF_TRAIN}"
+)
 if not os.path.isdir(MODEL_CHECKPOINT_STATE_DICTS_FOLDER):
     os.makedirs(MODEL_CHECKPOINT_STATE_DICTS_FOLDER)
 
 logging.getLogger().setLevel(logging.INFO)
 # Create file handler which logs even debug messages
-fh = logging.FileHandler(os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f'train_{START_OF_TRAIN}.log'))
+fh = logging.FileHandler(
+    os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"train_{START_OF_TRAIN}.log")
+)
 fh.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(fh)
 
 
 def extract_embeddings(
-        model: torch.nn.Module,
-        dataloader_instance: ClassificationNetwork,
-        epoch: int,
+    model: torch.nn.Module,
+    dataloader_instance: ClassificationNetwork,
+    epoch: int,
 ) -> (torch.nn.Module, List[List[float]], int):
     """
     Runs the main train loop.
@@ -64,14 +73,15 @@ def extract_embeddings(
             diff_vectors = np.vstack([diff_vectors, xgb_features])
             true_labels += label.squeeze().int().detach().cpu().tolist()
 
-
     # Calculate eval metrics
     xgb_model.fit(diff_vectors[1:, :], np.array(true_labels))
     predictions = xgb_model.predict_proba(diff_vectors[1:, :])[:, 1]
 
     roc_score = roc_auc_score(true_labels, predictions.squeeze())
-    logging.info("{} epoch finished. Train data ROC-AUC score based on euclidean similarity is {}".format(
-        epoch, roc_score)
+    logging.info(
+        "{} epoch finished. Train data ROC-AUC score based on euclidean similarity is {}".format(
+            epoch, roc_score
+        )
     )
 
     # # FIXME: delete later
@@ -86,11 +96,11 @@ def extract_embeddings(
 
 
 def validate(
-        model: torch.nn.Module,
-        xgb_model: XGBClassifier,
-        dataloader_instance: SiameseNetworkDatasetValidation,
-        epoch: int,
-        device: str = "cuda",
+    model: torch.nn.Module,
+    xgb_model: XGBClassifier,
+    dataloader_instance: SiameseNetworkDatasetValidation,
+    epoch: int,
+    device: str = "cuda",
 ) -> tuple[DataFrame, float]:
     true_label_values = list()
     image1_paths = list()
@@ -105,7 +115,9 @@ def validate(
             # Run model inference
             x0, x1, label, image1_path, image2_path = data_image_pair
             # sigmoid_output_difference_vector = model(x0.to(device), x1.to(device))
-            batch_embedding_vectors = model.extract_features(x0.to(device), x1.to(device))
+            batch_embedding_vectors = model.extract_features(
+                x0.to(device), x1.to(device)
+            )
             vecs1 = batch_embedding_vectors[:, :1280]
             vecs2 = batch_embedding_vectors[:, 1280:]
             diffs = vecs1 - vecs2
@@ -123,8 +135,10 @@ def validate(
     # Calculate ROC-AUC Score
     predictions = xgb_model.predict_proba(diff_vectors[1:, :])[:, 1]
     roc_auc_score_epoch = roc_auc_score(true_label_values, predictions)
-    logging.info("{} epoch finished. Test data ROC-AUC score based on euclidean similarity is {}".format(
-        epoch, roc_auc_score_epoch)
+    logging.info(
+        "{} epoch finished. Test data ROC-AUC score based on euclidean similarity is {}".format(
+            epoch, roc_auc_score_epoch
+        )
     )
     logging.info("=========================================")
 
@@ -146,13 +160,13 @@ if __name__ == "__main__":
     training_dataset = SiameseNetworkDataset(
         Config.training_csv,
         Config.training_dir,
-        transform=TRAINING_TRANSFORMATION_SEQUENCE_1
+        transform=TRAINING_TRANSFORMATION_SEQUENCE_1,
     )
     # Load the test dataset
     test_dataset = SiameseNetworkDatasetValidation(
         image_pair_label_csv=Config.testing_csv,
         image_directory=Config.testing_dir,
-        transform=TESTING_TRANSFORMATION_SEQUENCE_1
+        transform=TESTING_TRANSFORMATION_SEQUENCE_1,
     )
 
     # Load the dataset as pytorch tensors using dataloader
@@ -160,7 +174,7 @@ if __name__ == "__main__":
         training_dataset,
         shuffle=True,
         num_workers=12,
-        batch_size=Config.train_batch_size
+        batch_size=Config.train_batch_size,
     )
     test_dataloader = DataLoader(
         test_dataset,
@@ -172,7 +186,9 @@ if __name__ == "__main__":
 
     # Declare Siamese Network
     load_model_folder = "./modeling/model_store/classification_v0_stanford_cars_success_0.75_roc_public_test/"
-    load_model_from_state_dictionary = os.path.join(load_model_folder, "model_19_epoch.pt")
+    load_model_from_state_dictionary = os.path.join(
+        load_model_folder, "model_19_epoch.pt"
+    )
     net = ClassificationNetwork(load_model_from_state_dictionary).cuda()
 
     epoch = 19
@@ -183,17 +199,25 @@ if __name__ == "__main__":
 
     torch.save(
         net.state_dict(),
-        os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"model_{epoch}_epoch.pt")
+        os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"model_{epoch}_epoch.pt"),
     )
 
     # Save XGBoost
     output_classifier = pickle.dump(
         model_xgboost,
-        open(os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"output_classifier"), "wb")
+        open(
+            os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"output_classifier"),
+            "wb",
+        ),
     )
 
     # Validate
     df_epoch_validation, roc_auc_score_epoch = validate(
-        model=net, xgb_model=model_xgboost, dataloader_instance=test_dataloader, epoch=epoch,
+        model=net,
+        xgb_model=model_xgboost,
+        dataloader_instance=test_dataloader,
+        epoch=epoch,
     )
-    df_epoch_validation.to_csv(os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"validation_df_{epoch}"))
+    df_epoch_validation.to_csv(
+        os.path.join(MODEL_CHECKPOINT_STATE_DICTS_FOLDER, f"validation_df_{epoch}")
+    )

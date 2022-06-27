@@ -13,6 +13,7 @@ class SiameseNetwork(nn.Module):
     Pretrained model from
       https://debuggercafe.com/stanford-cars-classification-using-efficientnet-pytorch/ .
     """
+
     def __init__(self, load_model_from_state_dictionary: str = None):
         super(SiameseNetwork, self).__init__()
         # First load standard pretrained model
@@ -44,7 +45,9 @@ class SiameseNetwork(nn.Module):
         )
 
         if load_model_from_state_dictionary:
-            logging.info(f"Loading model weights from {load_model_from_state_dictionary}.")
+            logging.info(
+                f"Loading model weights from {load_model_from_state_dictionary}."
+            )
             self.load_state_dict(torch.load(load_model_from_state_dictionary))
 
     def forward_once(self, x):
@@ -64,8 +67,9 @@ class SiameseNetwork(nn.Module):
 
 class ClassificationNetwork(nn.Module):
     """
-    ...
+    Use with (Binary) Cross Entropy loss.
     """
+
     def __init__(self, load_model_from_state_dictionary: str = None):
         super(ClassificationNetwork, self).__init__()
         # First load standard pretrained model
@@ -125,7 +129,7 @@ class ClassificationNetwork(nn.Module):
 
 if __name__ == "__main__":
     from datetime import datetime
+
     nn_test = SiameseNetwork().cuda()
     with open(f"siamese_nn_layers_test_{datetime.now().isoformat()}.txt", "w") as f:
         f.write(str(dict(nn_test.named_modules())))
-
