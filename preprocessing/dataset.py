@@ -15,12 +15,16 @@ class Config:
     """
     Specs for training.
     """
-    training_dir = "../stanford_cars_dataset/dataset_siamese_nn/images"
-    training_csv = "../stanford_cars_dataset/dataset_siamese_nn/df_train_overfit_siamese.csv"  # FIXME: change back
-    testing_dir = "../stanford_cars_dataset/dataset_siamese_nn/images"
-    testing_csv = "../stanford_cars_dataset/dataset_siamese_nn/df_testing_siamese.csv"
+    training_dir = "../comp_cars_dataset/dataset_siamese_classification_nn/images"
+    # training_dir =  "../stanford_cars_dataset/dataset_siamese_nn/images"
+    training_csv = "../comp_cars_dataset/dataset_siamese_classification_nn/df_training_classification.csv"
+    # training_csv = "../stanford_cars_dataset/dataset_siamese_nn/df_training_siamese.csv"
+    testing_dir = "../comp_cars_dataset/dataset_siamese_classification_nn/images"
+    # testing_dir = "../stanford_cars_dataset/dataset_siamese_nn/images"
+    testing_csv = "../comp_cars_dataset/dataset_siamese_classification_nn/df_testing_classification.csv"
+    # testing_csv = "../stanford_cars_dataset/dataset_siamese_nn/df_testing_siamese.csv"
     train_batch_size = 8
-    train_number_epochs = 150
+    train_number_epochs = 10
     image_input_size = 224
 
 
@@ -29,9 +33,8 @@ NORMALISATION_1 = tv.transforms.Normalize(
     std=[0.229, 0.224, 0.225]
 )
 TRAINING_TRANSFORMATION_SEQUENCE_1 = tv.transforms.Compose([
-    # TODO: try with cropping
-    # tv.transforms.RandomResizedCrop(Config.image_input_size),
-    tv.transforms.Resize((Config.image_input_size, Config.image_input_size)),
+    tv.transforms.RandomResizedCrop(Config.image_input_size),
+    tv.transforms.RandomHorizontalFlip(),
     tv.transforms.ToTensor(),
     NORMALISATION_1
 ])

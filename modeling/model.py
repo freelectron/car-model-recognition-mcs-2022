@@ -44,6 +44,7 @@ class SiameseNetwork(nn.Module):
         )
 
         if load_model_from_state_dictionary:
+            logging.info(f"Loading model weights from {load_model_from_state_dictionary}.")
             self.load_state_dict(torch.load(load_model_from_state_dictionary))
 
     def forward_once(self, x):
@@ -63,8 +64,7 @@ class SiameseNetwork(nn.Module):
 
 class ClassificationNetwork(nn.Module):
     """
-    Pretrained model from
-      https://debuggercafe.com/stanford-cars-classification-using-efficientnet-pytorch/ .
+    ...
     """
     def __init__(self, load_model_from_state_dictionary: str = None):
         super(ClassificationNetwork, self).__init__()
@@ -90,7 +90,7 @@ class ClassificationNetwork(nn.Module):
 
         # Defining the fully connected layers
         self.fc1 = nn.Sequential(
-            nn.Linear(1280, 512),
+            nn.Linear(2560, 512),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.5),
             nn.Linear(512, 1),
@@ -101,16 +101,23 @@ class ClassificationNetwork(nn.Module):
             self.load_state_dict(torch.load(load_model_from_state_dictionary))
 
     def forward_once(self, x):
-        # Forward pass
+        # Forward pass through feature extractor
         output = self.cnn1(x)
         return output
+
+    def extract_features(self, input1, input2):
+        output1 = self.forward_once(input1)
+        # Forward pass of input 2
+        output2 = self.forward_once(input2)
+
+        return torch.hstack((output1, output2))
 
     def forward(self, input1, input2):
         # Forward pass of input 1
         output1 = self.forward_once(input1)
         # Forward pass of input 2
         output2 = self.forward_once(input2)
-        diffs = output1 - output2
+        diffs = torch.hstack((output1, output2))
         out = self.fc1(diffs)
 
         return out
